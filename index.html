@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-<title>富岳倉庫部材管理システム</title>
+<title>部材管理システム</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -427,7 +427,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 /* ─────────────────────────────────────
    CONFIG  ← 自分のRender URLに変更
 ───────────────────────────────────── */
-const API = "https://buzai1.onrender.com";
+// ↓↓↓ ここを自分のRender URLに変更してください ↓↓↓
+// 例: const API = "https://buzai1.onrender.com";
+// 末尾スラッシュなし、httpSあり
+const API = "https://YOUR-BUAIZAI-BACKEND.onrender.com";
 
 /* ─────────────────────────────────────
    STATE
@@ -487,8 +490,19 @@ const api = async (path, opts={}) => {
   const h = {"Content-Type":"application/json"};
   if (_token) h["Authorization"] = `Bearer ${_token}`;
   if (opts.isFile) { delete h["Content-Type"]; }
-  const r = await fetch(API+path, {...opts, headers:{...h,...(opts.headers||{})}});
-  if (!r.ok) { const t=await r.text(); throw new Error(t); }
+  const url = API + path;
+  let r;
+  try {
+    r = await fetch(url, {...opts, headers:{...h,...(opts.headers||{})}});
+  } catch (networkErr) {
+    console.error("[api] ネットワークエラー:", url, networkErr.message);
+    throw new Error("サーバーに接続できません。APIのURLを確認してください。\n" + networkErr.message);
+  }
+  if (!r.ok) {
+    const t = await r.text();
+    console.error("[api] HTTPエラー:", r.status, url, t);
+    throw new Error(t);
+  }
   return r.json();
 };
 
@@ -532,7 +546,20 @@ async function doLogin(){
     mountApp();
   }catch(e){
     document.getElementById("login-err").style.display="";
-    document.getElementById("login-err").textContent="IDまたはパスワードが正しくありません";
+    // エラーメッセージを解析して表示
+    let msg = "IDまたはパスワードが正しくありません";
+    try {
+      const errBody = JSON.parse(e.message);
+      if (errBody.detail) msg = errBody.detail;
+    } catch(_) {
+      // JSON解析失敗 = ネットワークエラーの可能性
+      if (e.message.includes("接続できません") || e.message.includes("Failed to fetch") || e.message.includes("NetworkError")) {
+        msg = "サーバーに接続できません。\nAPIのURLが正しいか確認してください。\n現在: " + API;
+      }
+    }
+    document.getElementById("login-err").style.display="";
+    document.getElementById("login-err").textContent=msg;
+    console.error("[doLogin] エラー:", e.message);
   }
 }
 
