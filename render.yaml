@@ -2,8 +2,8 @@ services:
   - type: web
     name: buaizai-api
     env: python
-    region: singapore          # Nearest to Japan
-    plan: free                 # Upgrade to starter for production
+    region: singapore
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -20,14 +20,18 @@ services:
         value: admin1234
       - key: ALLOWED_ORIGINS
         value: "*"
-      - key: STORAGE_BACKEND
-        value: local
-      - key: LOCAL_BASE_URL
-        value: https://buaizai-api.onrender.com   # ← 変更してください
       - key: TOKEN_EXPIRE_HOURS
         value: "12"
       - key: AUTO_CLEANUP_DAYS
         value: "0"
+      # ── Cloudinary ──────────────────────────────
+      # Render ダッシュボードで手動入力してください（シークレットのため）
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
 databases:
   - name: buaizai-db

@@ -1,100 +1,79 @@
 """
-Storage abstraction layer.
+Storage layer — Cloudinary backend
+====================================
+必要な環境変数:
+  CLOUDINARY_CLOUD_NAME
+  CLOUDINARY_API_KEY
+  CLOUDINARY_API_SECRET
 
-Priority:
-  1. Cloudflare R2 (via boto3 S3-compatible API) — set R2_* env vars
-  2. AWS S3 — set AWS_* env vars
-  3. Local filesystem fallback — files saved under ./uploads/
-
-Set STORAGE_BACKEND=r2 | s3 | local in .env
+写真は buaizai/photos/ フォルダに保存されます。
+削除時は public_id から自動判別して削除します。
 """
 import os
-import uuid
-import shutil
-from pathlib import Path
-from typing import BinaryIO
+import re
 
-BACKEND = os.getenv("STORAGE_BACKEND", "local").lower()
+import cloudinary
+import cloudinary.uploader
 
-# ── Cloudflare R2 / AWS S3 ───────────────────────
-R2_ACCOUNT_ID      = os.getenv("R2_ACCOUNT_ID", "")
-R2_ACCESS_KEY_ID   = os.getenv("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
-R2_BUCKET_NAME     = os.getenv("R2_BUCKET_NAME", "buaizai-photos")
-R2_PUBLIC_URL      = os.getenv("R2_PUBLIC_URL", "")   # e.g. https://pub.r2.dev/xxx
+# ── Cloudinary 初期設定 ───────────────────────────
+cloudinary.config(
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", ""),
+    api_key    = os.getenv("CLOUDINARY_API_KEY",    ""),
+    api_secret = os.getenv("CLOUDINARY_API_SECRET", ""),
+    secure     = True,   # 常にHTTPS
+)
 
-AWS_ACCESS_KEY_ID  = os.getenv("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-AWS_REGION         = os.getenv("AWS_REGION", "ap-northeast-1")
-AWS_BUCKET_NAME    = os.getenv("AWS_BUCKET_NAME", "buaizai-photos")
-AWS_PUBLIC_URL     = os.getenv("AWS_PUBLIC_URL", "")  # CloudFront or direct S3 URL
-
-# ── Local ────────────────────────────────────────
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
-LOCAL_BASE_URL = os.getenv("LOCAL_BASE_URL", "")  # e.g. https://your-render.com
+FOLDER = "buaizai/photos"
 
 
-def _get_s3_client(backend: str):
-    import boto3
-    if backend == "r2":
-        endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-        return boto3.client(
-            "s3",
-            endpoint_url=endpoint,
-            aws_access_key_id=R2_ACCESS_KEY_ID,
-            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-            region_name="auto",
-        ), R2_BUCKET_NAME, R2_PUBLIC_URL
-    else:
-        return boto3.client(
-            "s3",
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION,
-        ), AWS_BUCKET_NAME, AWS_PUBLIC_URL
+def upload_photo(file_obj, original_filename: str) -> str:
+    """
+    バイナリファイルをCloudinaryにアップロードして公開URLを返す。
 
+    Parameters
+    ----------
+    file_obj : file-like object (BinaryIO / BytesIO)
+    original_filename : str  元のファイル名（拡張子判定のみ使用）
 
-def upload_photo(file_obj: BinaryIO, original_filename: str) -> str:
-    """Upload photo and return public URL."""
-    ext = Path(original_filename).suffix.lower() or ".jpg"
-    filename = f"photos/{uuid.uuid4().hex}{ext}"
-
-    if BACKEND in ("r2", "s3"):
-        client, bucket, base_url = _get_s3_client(BACKEND)
-        content_type = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
-        client.upload_fileobj(
-            file_obj,
-            bucket,
-            filename,
-            ExtraArgs={"ContentType": content_type, "ACL": "public-read"},
-        )
-        if base_url:
-            return f"{base_url.rstrip('/')}/{filename}"
-        region = AWS_REGION if BACKEND == "s3" else "auto"
-        return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"
-
-    # Local fallback
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    local_path = UPLOAD_DIR / filename.replace("/", "_")
-    with open(local_path, "wb") as f:
-        shutil.copyfileobj(file_obj, f)
-    base = LOCAL_BASE_URL.rstrip("/") if LOCAL_BASE_URL else ""
-    return f"{base}/static/uploads/{local_path.name}"
+    Returns
+    -------
+    str  Cloudinaryの公開URL (https://res.cloudinary.com/...)
+    """
+    result = cloudinary.uploader.upload(
+        file_obj,
+        folder         = FOLDER,
+        resource_type  = "image",
+        # 横幅1920px超は自動縮小、品質・形式を自動最適化
+        transformation = [
+            {
+                "width": 1920,
+                "crop": "limit",
+                "quality": "auto:good",
+                "fetch_format": "auto",
+            }
+        ],
+        overwrite = False,
+    )
+    return result["secure_url"]
 
 
 def delete_photo(url: str) -> None:
-    """Best-effort delete — ignores errors."""
+    """
+    CloudinaryのURLからpublic_idを逆算して削除する。
+    エラーは無視（ベストエフォート）。
+
+    URL例:
+      https://res.cloudinary.com/CLOUD/image/upload/v123456/buaizai/photos/abcdef.jpg
+    → public_id = buaizai/photos/abcdef
+    """
     if not url:
         return
     try:
-        if BACKEND in ("r2", "s3"):
-            client, bucket, base_url = _get_s3_client(BACKEND)
-            key = url.split(base_url.rstrip("/") + "/")[-1]
-            client.delete_object(Bucket=bucket, Key=key)
-        else:
-            filename = url.split("/")[-1]
-            path = UPLOAD_DIR / filename
-            if path.exists():
-                path.unlink()
+        # /upload/ 以降、バージョン番号を除いた部分から拡張子を除く
+        match = re.search(r"/upload/(?:v\d+/)?(.+)\.[a-zA-Z0-9]+$", url)
+        if not match:
+            return
+        public_id = match.group(1)
+        cloudinary.uploader.destroy(public_id, resource_type="image")
     except Exception:
-        pass
+        pass  # 削除失敗はベストエフォートで無視
