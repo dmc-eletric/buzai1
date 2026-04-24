@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>部材管理システム</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f9fa;min-height:100vh;}
+
+/* ── AUTH ── */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.auth-card{background:#fff;border-radius:20px;padding:40px 32px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08);}
+
+/* ── APP SHELL ── */
+#app-shell{display:none;flex-direction:column;height:100vh;}
+.topbar{height:52px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;z-index:50;}
+.topbar-title{font-size:15px;font-weight:700;color:#111827;flex:1;}
+.topbar-user{font-size:12px;color:#6b7280;}
+
+/* ── LAYOUT ── */
+.app-body{flex:1;display:flex;overflow:hidden;}
+.sidebar{width:200px;flex-shrink:0;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;overflow-y:auto;}
+.main-area{flex:1;overflow-y:auto;}
+@media(max-width:640px){
+  .sidebar{display:none!important;}
+  #mobile-nav{display:flex!important;}
+  .main-area{height:calc(100vh - 52px - 60px);overflow-y:auto;}
+  .page{padding:14px!important;}
+}
+
+/* ── SIDEBAR ── */
+.slink{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13px;color:#4b5563;cursor:pointer;transition:background .1s;margin:1px 8px;}
+.slink:hover{background:#f3f4f6;}
+.slink.active{background:#fef3c7;color:#92400e;font-weight:600;}
+.slink svg{width:16px;height:16px;flex-shrink:0;}
+.scat{font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.06em;padding:8px 20px 3px;}
+
+/* ── MOBILE NAV ── */
+#mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:60px;background:#fff;border-top:1px solid #e5e7eb;z-index:100;align-items:stretch;}
+.mnav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#9ca3af;border:none;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.mnav.active{color:#d97706;}
+.mnav svg{width:20px;height:20px;}
+#more-d{display:none;position:fixed;bottom:60px;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;z-index:99;padding:6px 0;}
+#more-d.open{display:block;}
+.mrow{display:flex;align-items:center;gap:12px;padding:11px 20px;font-size:14px;color:#374151;cursor:pointer;}
+.mrow svg{width:18px;height:18px;}
+#mbg{display:none;position:fixed;inset:0;z-index:98;}
+#mbg.open{display:block;}
+
+/* ── PAGES ── */
+.page{padding:20px;max-width:680px;margin:0 auto;}
+.page.hidden{display:none;}
+.pg-title{font-size:18px;font-weight:700;color:#111827;margin-bottom:16px;}
+
+/* ── COMPONENTS ── */
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;}
+.btn{padding:10px 0;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;width:100%;transition:opacity .15s;}
+.btn:active{opacity:.8;}
+.btn-amber{background:#d97706;color:#fff;}
+.btn-green{background:#059669;color:#fff;}
+.btn-red{background:#dc2626;color:#fff;}
+.btn-gray{background:#374151;color:#fff;}
+.btn-outline{background:#fff;border:1.5px solid #d1d5db;color:#374151;}
+.btn-sm{width:auto;padding:6px 14px;font-size:12px;border-radius:7px;}
+.inp{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:9px 12px;font-size:14px;outline:none;font-family:inherit;background:#fff;}
+.inp:focus{border-color:#f59e0b;}
+.sel{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:9px 12px;font-size:14px;outline:none;background:#fff;font-family:inherit;}
+.lbl{font-size:12px;color:#6b7280;display:block;margin-bottom:5px;font-weight:500;}
+.fg{margin-bottom:12px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;text-align:center;}
+.stat-val{font-size:26px;font-weight:700;}
+.stat-lbl{font-size:11px;color:#6b7280;margin-top:3px;}
+
+/* STATUS BADGES */
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;letter-spacing:.03em;}
+.badge-ready{background:#d1fae5;color:#065f46;}
+.badge-used{background:#e5e7eb;color:#6b7280;}
+.badge-admin{background:#fef3c7;color:#92400e;}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:20px;}
+.modal-title{font-size:16px;font-weight:700;color:#111827;margin-bottom:14px;}
+
+/* ── CAMERA ── */
+#cam-container{border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;max-width:360px;margin:0 auto;}
+.cam-wrap{position:relative;max-width:360px;margin:0 auto;}
+.cam-overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,.58);border-radius:12px;z-index:10;align-items:center;justify-content:center;flex-direction:column;gap:8px;}
+.cam-overlay.show{display:flex;}
+
+/* ── PREVIEW IMG ── */
+#photo-preview{display:none;max-width:320px;margin:10px auto;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;}
+#photo-preview img{width:100%;display:block;}
+
+/* ── QR PRINT ── */
+#qr-display{display:none;text-align:center;padding:16px;}
+#qr-canvas{display:inline-block;}
+.print-label{background:#fff;padding:12px;display:inline-block;border:1px solid #e5e7eb;border-radius:8px;}
+
+/* ── SEARCH ── */
+.search-wrap{position:relative;margin-bottom:12px;}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#9ca3af;pointer-events:none;}
+.search-inp{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:8px 12px 8px 34px;font-size:14px;outline:none;background:#fff;}
+.search-inp:focus{border-color:#f59e0b;}
+
+/* ── ITEM CARD ── */
+.item-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;display:flex;gap:12px;cursor:pointer;transition:border-color .15s;}
+.item-card:hover{border-color:#f59e0b;}
+.item-thumb{width:60px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#f3f4f6;}
+.item-thumb.no-img{display:flex;align-items:center;justify-content:center;}
+.item-thumb.no-img svg{width:24px;height:24px;color:#d1d5db;}
+.item-info{flex:1;min-width:0;}
+.item-name{font-size:14px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.item-sub{font-size:12px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.item-meta{font-size:11px;color:#9ca3af;margin-top:4px;}
+
+/* ── TOAST ── */
+#toast{display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;font-size:13px;padding:9px 18px;border-radius:10px;z-index:500;white-space:nowrap;pointer-events:none;}
+
+/* ── DETAIL POPUP ── */
+#detail-modal .detail-row{display:grid;grid-template-columns:90px 1fr;gap:4px 10px;font-size:13px;margin-bottom:4px;}
+#detail-modal .detail-lbl{color:#9ca3af;}
+#detail-modal .detail-val{color:#111827;font-weight:500;word-break:break-all;}
+
+@media print{
+  body *{display:none!important;}
+  #print-area,#print-area *{display:block!important;}
+  #print-area{position:fixed;inset:0;display:flex!important;align-items:center;justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ AUTH SCREEN ══════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="width:56px;height:56px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <svg fill="none" stroke="#d97706" viewBox="0 0 24 24" style="width:28px;height:28px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11"/></svg>
+      </div>
+      <h1 style="font-size:20px;font-weight:700;color:#111827;">部材管理システム</h1>
+      <p style="font-size:13px;color:#6b7280;margin-top:4px;">ログインしてください</p>
+    </div>
+    <div class="fg"><label class="lbl">ユーザーID</label><input class="inp" id="login-user" type="text" placeholder="user@example.com" autocomplete="username"/></div>
+    <div class="fg"><label class="lbl">パスワード</label><input class="inp" id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+    <p id="login-err" style="display:none;color:#dc2626;font-size:12px;margin-bottom:10px;">IDまたはパスワードが正しくありません</p>
+    <button class="btn btn-amber" onclick="doLogin()">ログイン</button>
+    <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:12px;">アカウントはシステム管理者が発行します</p>
+  </div>
+</div>
+
+<!-- ══════════ APP SHELL ══════════ -->
+<div id="app-shell">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div style="width:32px;height:32px;background:#fef3c7;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg fill="none" stroke="#d97706" viewBox="0 0 24 24" style="width:18px;height:18px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11"/></svg>
+    </div>
+    <span class="topbar-title">部材管理システム</span>
+    <span class="topbar-user" id="topbar-user"></span>
+    <span id="topbar-role" class="badge" style="margin-left:4px;"></span>
+    <button onclick="doLogout()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:12px;margin-left:6px;">ログアウト</button>
+  </div>
+
+  <div class="app-body">
+    <!-- Desktop sidebar -->
+    <nav class="sidebar">
+      <div style="padding:12px 0 4px;">
+        <div class="scat">MAIN</div>
+        <a class="slink" id="sl-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>ダッシュボード</a>
+        <a class="slink" id="sl-add" onclick="go('add')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>ADD 部材</a>
+        <a class="slink" id="sl-use" onclick="go('use')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>USE 部材</a>
+        <div class="scat">MONITOR</div>
+        <a class="slink" id="sl-list" onclick="go('list')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>部材一覧</a>
+        <a class="slink" id="sl-history" onclick="go('history')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>操作履歴</a>
+        <div class="scat" id="sl-admin-cat" style="display:none;">ADMIN</div>
+        <a class="slink" id="sl-admin" onclick="go('admin')" style="display:none;"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>管理設定</a>
+      </div>
+    </nav>
+
+    <!-- Pages -->
+    <div class="main-area">
+
+      <!-- ── DASHBOARD ── -->
+      <div id="page-dashboard" class="page hidden">
+        <h2 class="pg-title">ダッシュボード</h2>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+          <div class="stat-card"><div class="stat-val" style="color:#059669;" id="ds-ready">-</div><div class="stat-lbl">READY（使用可能）</div></div>
+          <div class="stat-card"><div class="stat-val" style="color:#6b7280;" id="ds-used-today">-</div><div class="stat-lbl">USED（本日）</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
+          <div class="stat-card"><div class="stat-val" style="color:#d97706;" id="ds-total">-</div><div class="stat-lbl">総登録数</div></div>
+          <div class="stat-card"><div class="stat-val" style="color:#374151;" id="ds-used-all">-</div><div class="stat-lbl">USED（累計）</div></div>
+        </div>
+        <h3 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:10px;">機種別 READY数</h3>
+        <div id="ds-by-model" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;"></div>
+        <h3 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:10px;">担当者別 本日登録数</h3>
+        <div id="ds-by-user" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- ── ADD 部材 ── -->
+      <div id="page-add" class="page hidden">
+        <h2 class="pg-title">ADD 部材</h2>
+
+        <!-- Step 1: 写真撮影 -->
+        <div id="add-step1" class="card" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">① 写真撮影</p>
+          <div class="cam-wrap">
+            <div id="cam-add" style="border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;max-width:360px;margin:0 auto;"></div>
+            <div class="cam-overlay" id="cam-add-overlay">
+              <svg fill="none" stroke="#fff" viewBox="0 0 24 24" style="width:44px;height:44px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+              <span style="color:#fff;font-size:13px;font-weight:600;">撮影完了</span>
+            </div>
+          </div>
+          <div id="photo-preview" style="display:none;max-width:360px;margin:10px auto;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+            <img id="preview-img" src="" alt="" style="width:100%;display:block;"/>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-outline btn-sm" onclick="startAddCamera()">カメラ起動</button>
+            <button class="btn btn-amber btn-sm" id="capture-btn" onclick="capturePhoto()" style="display:none;">撮影</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input').click()">ファイル選択</button>
+            <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect(event)"/>
+          </div>
+        </div>
+
+        <!-- Step 2: 情報入力 -->
+        <div id="add-step2" class="card" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:600;color:#374151;margin-bottom:12px;">② 情報入力</p>
+          <div class="row2">
+            <div class="fg"><label class="lbl">機種名 *</label><input class="inp" id="f-model" type="text" placeholder="例：MA-9500"/></div>
+            <div class="fg"><label class="lbl">シリアル番号 *</label><input class="inp" id="f-serial" type="text" placeholder="例：SN123456"/></div>
+          </div>
+          <div class="fg"><label class="lbl">製品名 *</label><input class="inp" id="f-product" type="text" placeholder="例：基板 A Rev2.1"/></div>
+          <div class="fg"><label class="lbl">管理コード（外部）</label><input class="inp" id="f-extcode" type="text" placeholder="既存の管理番号があれば入力"/></div>
+          <div class="fg"><label class="lbl">依頼者</label><input class="inp" id="f-requester" type="text" placeholder="誰から依頼されましたか？"/></div>
+          <div class="fg"><label class="lbl">備考</label><textarea class="inp" id="f-note" rows="2" style="resize:none;" placeholder="補足情報など"></textarea></div>
+          <div class="card" style="background:#fef3c7;border-color:#f59e0b;margin-top:4px;">
+            <p style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:6px;">自動生成情報</p>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;">
+              <span style="color:#92400e;">内部管理コード</span><span id="auto-code" style="font-weight:600;color:#111827;font-family:monospace;">—</span>
+              <span style="color:#92400e;">操作者</span><span id="auto-operator" style="font-weight:600;color:#111827;">—</span>
+              <span style="color:#92400e;">登録日時</span><span id="auto-datetime" style="font-weight:600;color:#111827;">—</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-amber" onclick="confirmAdd()">確認して登録</button>
+
+        <!-- Step 3: QR表示 -->
+        <div id="add-step3" style="display:none;margin-top:16px;" class="card">
+          <p style="font-size:13px;font-weight:600;color:#059669;margin-bottom:12px;">✓ 登録完了 — QRコード</p>
+          <div id="qr-display" style="display:block;text-align:center;margin-bottom:12px;">
+            <div id="qr-canvas" style="display:inline-block;"></div>
+          </div>
+          <div id="qr-label-preview" style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;font-size:12px;">
+            <div id="qr-label-code" style="font-weight:700;font-family:monospace;font-size:13px;"></div>
+            <div id="qr-label-product" style="color:#374151;margin-top:2px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-gray btn-sm" onclick="printQR()">&#128438; 印刷（Webプリント）</button>
+            <button class="btn btn-outline btn-sm" onclick="resetAddForm()">新規登録</button>
+          </div>
+          <p style="font-size:11px;color:#9ca3af;margin-top:8px;">※ ネットワークプリンターが設定されている場合は直接印刷されます</p>
+        </div>
+      </div>
+
+      <!-- ── USE 部材 ── -->
+      <div id="page-use" class="page hidden">
+        <h2 class="pg-title">USE 部材</h2>
+        <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">QRコードをスキャンして部材を使用済みにします</p>
+        <div class="cam-wrap" style="margin-bottom:14px;">
+          <div id="cam-use" style="border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;max-width:360px;margin:0 auto;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input class="inp" id="use-code-input" type="text" placeholder="管理コードを直接入力" style="flex:1;"/>
+          <button onclick="useByCode()" style="background:#d97706;color:#fff;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;">検索</button>
+        </div>
+      </div>
+
+      <!-- ── 部材一覧 ── -->
+      <div id="page-list" class="page hidden">
+        <h2 class="pg-title">部材一覧</h2>
+        <!-- Filters -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="search-wrap">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+            <input class="search-inp" id="list-q" type="text" placeholder="製品名・管理コード・機種名・シリアルで検索" oninput="filterList()"/>
+          </div>
+          <div class="row2" style="gap:8px;">
+            <div><label class="lbl">ステータス</label>
+              <select class="sel" id="list-status" onchange="filterList()">
+                <option value="">すべて</option>
+                <option value="READY">READY</option>
+                <option value="USED">USED</option>
+              </select>
+            </div>
+            <div><label class="lbl">機種</label>
+              <select class="sel" id="list-model" onchange="filterList()"><option value="">すべて</option></select>
+            </div>
+          </div>
+          <div class="row2" style="gap:8px;margin-top:8px;">
+            <div><label class="lbl">操作者</label>
+              <select class="sel" id="list-operator" onchange="filterList()"><option value="">すべて</option></select>
+            </div>
+            <div><label class="lbl">登録日</label>
+              <input class="inp" id="list-date" type="date" onchange="filterList()"/>
+            </div>
+          </div>
+        </div>
+        <div id="list-count" style="font-size:12px;color:#6b7280;margin-bottom:8px;"></div>
+        <div id="list-content" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- ── 操作履歴 ── -->
+      <div id="page-history" class="page hidden">
+        <h2 class="pg-title">操作履歴</h2>
+        <div class="search-wrap">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+          <input class="search-inp" id="hist-q" type="text" placeholder="管理コード・操作者で検索" oninput="filterHistory()"/>
+        </div>
+        <div id="history-content" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- ── ADMIN ── -->
+      <div id="page-admin" class="page hidden">
+        <h2 class="pg-title">管理設定</h2>
+        <!-- User management -->
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <p style="font-size:14px;font-weight:600;color:#374151;">ユーザー管理</p>
+            <button class="btn btn-amber btn-sm" onclick="showAddUserModal()">+ 追加</button>
+          </div>
+          <div id="user-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <!-- Auto-cleanup settings -->
+        <div class="card" style="margin-bottom:14px;">
+          <p style="font-size:14px;font-weight:600;color:#374151;margin-bottom:10px;">自動削除設定</p>
+          <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">USED状態の部材を指定日数後に自動削除します（ストレージ節約）</p>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input class="inp" id="cleanup-days" type="number" min="1" max="365" value="30" style="width:100px;"/>
+            <span style="font-size:13px;color:#374151;">日後に削除</span>
+            <button class="btn btn-red btn-sm" style="width:auto;" onclick="runCleanup()">今すぐ実行</button>
+          </div>
+          <p style="font-size:11px;color:#9ca3af;margin-top:8px;">最終実行: <span id="last-cleanup">—</span></p>
+        </div>
+        <!-- Printer settings -->
+        <div class="card">
+          <p style="font-size:14px;font-weight:600;color:#374151;margin-bottom:10px;">プリンター設定</p>
+          <div class="fg"><label class="lbl">プリンターURL（ローカルIPなど）</label><input class="inp" id="printer-url" type="text" placeholder="例：http://192.168.1.100:8888/print"/></div>
+          <button class="btn btn-outline btn-sm" onclick="savePrinterUrl()">保存</button>
+          <p style="font-size:11px;color:#9ca3af;margin-top:8px;">ZPLまたはESC/POSプリンター対応のミドルウェアが必要です</p>
+        </div>
+      </div>
+
+    </div><!-- /main-area -->
+  </div><!-- /app-body -->
+
+  <!-- Mobile bottom nav -->
+  <nav id="mobile-nav">
+    <button class="mnav" id="mn-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Home</button>
+    <button class="mnav" id="mn-add"       onclick="go('add')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>ADD</button>
+    <button class="mnav" id="mn-use"       onclick="go('use')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>USE</button>
+    <button class="mnav" id="mn-list"      onclick="go('list')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>一覧</button>
+    <button class="mnav" id="mn-more"      onclick="toggleMore()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
+  </nav>
+  <div id="mbg" onclick="closeMore()"></div>
+  <div id="more-d">
+    <div class="mrow" onclick="go('history');closeMore()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>操作履歴</div>
+    <div class="mrow" id="mn-admin-row" onclick="go('admin');closeMore()" style="display:none;"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>管理設定</div>
+    <div style="padding:8px 20px;border-top:1px solid #f3f4f6;font-size:12px;color:#9ca3af;">
+      ログイン中: <span id="mob-user" style="font-weight:600;color:#374151;"></span>
+    </div>
+  </div>
+</div><!-- /app-shell -->
+
+<!-- ══════════ MODALS ══════════ -->
+<!-- Detail popup -->
+<div class="modal-bg" id="detail-modal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 class="modal-title" style="margin:0;">部材詳細</h3>
+      <button onclick="closeModal('detail-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">&#215;</button>
+    </div>
+    <img id="dm-photo" src="" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:none;"/>
+    <div id="dm-fields"></div>
+    <div id="dm-actions" style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+<!-- Add user modal -->
+<div class="modal-bg" id="add-user-modal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 class="modal-title" style="margin:0;">ユーザー追加</h3>
+      <button onclick="closeModal('add-user-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">&#215;</button>
+    </div>
+    <div class="fg"><label class="lbl">ユーザーID（メール等）</label><input class="inp" id="nu-id" type="text" placeholder="user@example.com"/></div>
+    <div class="fg"><label class="lbl">パスワード</label><input class="inp" id="nu-pass" type="password" placeholder="8文字以上"/></div>
+    <div class="fg"><label class="lbl">表示名</label><input class="inp" id="nu-name" type="text" placeholder="山田 太郎"/></div>
+    <div class="fg"><label class="lbl">権限</label>
+      <select class="sel" id="nu-role">
+        <option value="user">一般ユーザー</option>
+        <option value="admin">管理者</option>
+      </select>
+    </div>
+    <button class="btn btn-amber" onclick="createUser()">ユーザーを追加</button>
+  </div>
+</div>
+
+<!-- PRINT AREA (hidden, only shown on print) -->
+<div id="print-area" style="display:none;text-align:center;padding:20px;">
+  <div id="print-qr"></div>
+  <div id="print-code" style="font-family:monospace;font-size:16px;font-weight:700;margin-top:8px;"></div>
+  <div id="print-name" style="font-size:13px;margin-top:4px;"></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ══════════ JAVASCRIPT ══════════ -->
+<script>
+/* ─────────────────────────────────────
+   CONFIG  ← 自分のRender URLに変更
+───────────────────────────────────── */
+const API = "https://YOUR-BUAIZAI-BACKEND.onrender.com";
+
+/* ─────────────────────────────────────
+   STATE
+───────────────────────────────────── */
+let _token   = localStorage.getItem("bm_token")    || null;
+let _isAdmin = localStorage.getItem("bm_is_admin") === "true";
+let _userName= localStorage.getItem("bm_username") || "";
+let _userId  = localStorage.getItem("bm_userid")   || "";
+
+let _addCamera    = null;
+let _useScanner   = null;
+let _capturedBlob = null;
+let _capturedDataUrl = null;
+let _addStream    = null;
+let _scanLocked   = false;
+
+let _allItems     = [];
+let _allHistory   = [];
+let _currentItem  = null; // item being viewed in detail
+
+const PRINTER_URL_KEY = "bm_printer_url";
+
+/* ─────────────────────────────────────
+   HELPERS
+───────────────────────────────────── */
+function esc(s){ if(s==null)return""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function toast(msg, ms=2200){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.style.display="block";
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.style.display="none",ms);
+}
+
+function nowJP(){
+  return new Date().toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+function todayStr(){
+  const d=new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function fmtDate(iso){
+  if(!iso) return "—";
+  const d=new Date(iso);
+  return d.toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+}
+
+/* Build internal code: YYYYMMDD-MODEL-NNN */
+function buildInternalCode(model, seq){
+  const m=(model||"XX").replace(/[^a-zA-Z0-9\-]/g,"").toUpperCase().slice(0,8);
+  return `${todayStr()}-${m}-${String(seq).padStart(3,"0")}`;
+}
+
+const api = async (path, opts={}) => {
+  const h = {"Content-Type":"application/json"};
+  if (_token) h["Authorization"] = `Bearer ${_token}`;
+  if (opts.isFile) { delete h["Content-Type"]; }
+  const r = await fetch(API+path, {...opts, headers:{...h,...(opts.headers||{})}});
+  if (!r.ok) { const t=await r.text(); throw new Error(t); }
+  return r.json();
+};
+
+const apiUpload = async (path, formData) => {
+  const h = {};
+  if (_token) h["Authorization"] = `Bearer ${_token}`;
+  const r = await fetch(API+path, {method:"POST", headers:h, body:formData});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+};
+
+function closeModal(id){ document.getElementById(id).classList.remove("open"); }
+
+function toggleMore(){ document.getElementById("more-d").classList.toggle("open"); document.getElementById("mbg").classList.toggle("open"); }
+function closeMore(){ document.getElementById("more-d").classList.remove("open"); document.getElementById("mbg").classList.remove("open"); }
+
+function stopScanners(){
+  if(_addCamera){ _addCamera.stop().catch(()=>{}); _addCamera=null; }
+  if(_useScanner){ _useScanner.stop().catch(()=>{}); _useScanner=null; }
+  if(_addStream){ _addStream.getTracks().forEach(t=>t.stop()); _addStream=null; }
+}
+
+/* ─────────────────────────────────────
+   AUTH
+───────────────────────────────────── */
+async function doLogin(){
+  document.getElementById("login-err").style.display="none";
+  const uid=document.getElementById("login-user").value.trim();
+  const pw =document.getElementById("login-pass").value;
+  if(!uid||!pw){document.getElementById("login-err").style.display="";document.getElementById("login-err").textContent="IDとパスワードを入力してください"; return;}
+  try{
+    const res=await api("/auth/login",{method:"POST",body:JSON.stringify({username:uid,password:pw})});
+    _token  =res.access_token;
+    _isAdmin=res.is_admin;
+    _userName=res.display_name||res.username;
+    _userId =res.username;
+    localStorage.setItem("bm_token",_token);
+    localStorage.setItem("bm_is_admin",_isAdmin);
+    localStorage.setItem("bm_username",_userName);
+    localStorage.setItem("bm_userid",_userId);
+    mountApp();
+  }catch(e){
+    document.getElementById("login-err").style.display="";
+    document.getElementById("login-err").textContent="IDまたはパスワードが正しくありません";
+  }
+}
+
+document.getElementById("login-pass").addEventListener("keydown",e=>{if(e.key==="Enter") doLogin();});
+
+function doLogout(){
+  _token=null;_isAdmin=false;_userName="";_userId="";
+  localStorage.removeItem("bm_token");localStorage.removeItem("bm_is_admin");
+  localStorage.removeItem("bm_username");localStorage.removeItem("bm_userid");
+  document.getElementById("app-shell").style.display="none";
+  document.getElementById("auth-screen").style.display="flex";
+  stopScanners();
+}
+
+function mountApp(){
+  document.getElementById("auth-screen").style.display="none";
+  document.getElementById("app-shell").style.display="flex";
+  document.getElementById("topbar-user").textContent=_userName;
+  document.getElementById("topbar-role").textContent=_isAdmin?"管理者":"ユーザー";
+  document.getElementById("topbar-role").className="badge "+(_isAdmin?"badge-admin":"");
+  document.getElementById("mob-user").textContent=_userName;
+  /* Show admin menu if admin */
+  ["sl-admin","sl-admin-cat"].forEach(id=>document.getElementById(id).style.display=_isAdmin?"":"none");
+  document.getElementById("mn-admin-row").style.display=_isAdmin?"":"none";
+  /* Printer URL */
+  document.getElementById("printer-url").value=localStorage.getItem(PRINTER_URL_KEY)||"";
+  go("dashboard");
+}
+
+/* Auto-login if token exists */
+if(_token && _userName){
+  document.getElementById("auth-screen").style.display="none";
+  mountApp();
+}
+
+/* ─────────────────────────────────────
+   NAVIGATION
+───────────────────────────────────── */
+function go(page){
+  stopScanners();
+  _scanLocked=false;
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
+  document.getElementById("page-"+page).classList.remove("hidden");
+  /* Sidebar active */
+  document.querySelectorAll(".slink").forEach(l=>l.classList.remove("active"));
+  const sl=document.getElementById("sl-"+page); if(sl) sl.classList.add("active");
+  /* Mobile nav active */
+  document.querySelectorAll(".mnav").forEach(b=>b.classList.remove("active"));
+  const mn=document.getElementById("mn-"+page); if(mn) mn.classList.add("active");
+  if(["history","admin"].includes(page)) document.getElementById("mn-more").classList.add("active");
+  closeMore();
+  /* Load data */
+  if(page==="dashboard") loadDashboard();
+  if(page==="add") initAddPage();
+  if(page==="use") initUsePage();
+  if(page==="list") loadList();
+  if(page==="history") loadHistory();
+  if(page==="admin" && _isAdmin) loadAdmin();
+}
+
+/* ─────────────────────────────────────
+   DASHBOARD
+───────────────────────────────────── */
+async function loadDashboard(){
+  try{
+    const stats=await api("/items/stats");
+    document.getElementById("ds-ready").textContent=stats.ready??"-";
+    document.getElementById("ds-used-today").textContent=stats.used_today??"-";
+    document.getElementById("ds-total").textContent=stats.total??"-";
+    document.getElementById("ds-used-all").textContent=stats.used_all??"-";
+    /* By model */
+    const byModel=stats.by_model||[];
+    document.getElementById("ds-by-model").innerHTML=byModel.length?byModel.map(r=>`
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;font-weight:600;color:#374151;">${esc(r.model)}</span>
+        <span style="font-size:13px;color:#059669;font-weight:700;">${r.count} READY</span>
+      </div>`).join(""):`<p style="font-size:13px;color:#9ca3af;text-align:center;padding:10px;">データなし</p>`;
+    /* By user */
+    const byUser=stats.by_user_today||[];
+    document.getElementById("ds-by-user").innerHTML=byUser.length?byUser.map(r=>`
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:#374151;">${esc(r.operator)}</span>
+        <span style="font-size:13px;color:#d97706;font-weight:700;">${r.count}件</span>
+      </div>`).join(""):`<p style="font-size:13px;color:#9ca3af;text-align:center;padding:10px;">本日の登録なし</p>`;
+  }catch(e){ toast("ダッシュボード読み込みエラー: "+e.message); }
+}
+
+/* ─────────────────────────────────────
+   ADD PAGE
+───────────────────────────────────── */
+function initAddPage(){
+  _capturedBlob=null; _capturedDataUrl=null;
+  document.getElementById("photo-preview").style.display="none";
+  document.getElementById("capture-btn").style.display="none";
+  document.getElementById("add-step3").style.display="none";
+  ["f-model","f-serial","f-product","f-extcode","f-requester","f-note"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("auto-operator").textContent=_userName;
+  updateAutoCode();
+  setInterval(()=>{ document.getElementById("auto-datetime").textContent=nowJP(); },1000);
+}
+
+document.getElementById("f-model").addEventListener("input",updateAutoCode);
+
+async function updateAutoCode(){
+  const model=(document.getElementById("f-model").value||"XX").replace(/[^a-zA-Z0-9\-]/g,"").toUpperCase().slice(0,8);
+  let seq=1;
+  try{
+    const r=await api(`/items/next-seq?date=${todayStr()}&model=${encodeURIComponent(model)}`);
+    seq=r.seq||1;
+  }catch(_){}
+  document.getElementById("auto-code").textContent=buildInternalCode(model,seq);
+  document.getElementById("auto-datetime").textContent=nowJP();
+}
+
+/* Camera for ADD */
+async function startAddCamera(){
+  if(_addCamera){_addCamera.stop().catch(()=>{});_addCamera=null;}
+  if(_addStream){_addStream.getTracks().forEach(t=>t.stop());_addStream=null;}
+  const container=document.getElementById("cam-add");
+  container.innerHTML="";
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});
+    _addStream=stream;
+    const video=document.createElement("video");
+    video.srcObject=stream; video.autoplay=true; video.playsInline=true;
+    video.style.cssText="width:100%;display:block;";
+    container.appendChild(video);
+    document.getElementById("capture-btn").style.display="";
+  }catch(e){ toast("カメラ起動失敗: "+e.message); }
+}
+
+function capturePhoto(){
+  if(!_addStream) return;
+  const video=document.querySelector("#cam-add video");
+  if(!video) return;
+  const canvas=document.createElement("canvas");
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  canvas.toBlob(blob=>{
+    _capturedBlob=blob;
+    _capturedDataUrl=canvas.toDataURL("image/jpeg",0.85);
+    document.getElementById("preview-img").src=_capturedDataUrl;
+    document.getElementById("photo-preview").style.display="";
+    document.getElementById("cam-add-overlay").classList.add("show");
+    /* Stop stream after capture */
+    _addStream.getTracks().forEach(t=>t.stop()); _addStream=null;
+    document.getElementById("capture-btn").style.display="none";
+  },"image/jpeg",0.85);
+}
+
+function handleFileSelect(e){
+  const file=e.target.files[0]; if(!file) return;
+  _capturedBlob=file;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    _capturedDataUrl=ev.target.result;
+    document.getElementById("preview-img").src=_capturedDataUrl;
+    document.getElementById("photo-preview").style.display="";
+    document.getElementById("cam-add-overlay").classList.remove("show");
+  };
+  reader.readAsDataURL(file);
+}
+
+async function confirmAdd(){
+  const model=document.getElementById("f-model").value.trim();
+  const serial=document.getElementById("f-serial").value.trim();
+  const product=document.getElementById("f-product").value.trim();
+  if(!model||!serial||!product){ toast("機種名・シリアル番号・製品名は必須です"); return; }
+
+  let photoUrl="";
+  /* Upload photo if captured */
+  if(_capturedBlob){
+    try{
+      const fd=new FormData();
+      fd.append("file",_capturedBlob,"photo.jpg");
+      const r=await apiUpload("/upload/photo",fd);
+      photoUrl=r.url||"";
+    }catch(e){ toast("写真アップロード失敗（続行します）"); }
+  }
+
+  /* Get next seq for internal code */
+  let seq=1;
+  const modelCode=(model||"XX").replace(/[^a-zA-Z0-9\-]/g,"").toUpperCase().slice(0,8);
+  try{
+    const r=await api(`/items/next-seq?date=${todayStr()}&model=${encodeURIComponent(modelCode)}`);
+    seq=r.seq||1;
+  }catch(_){}
+  const internalCode=buildInternalCode(modelCode,seq);
+
+  const body={
+    internal_code:internalCode,
+    model,serial,product,
+    ext_code: document.getElementById("f-extcode").value.trim(),
+    requester:document.getElementById("f-requester").value.trim(),
+    note:document.getElementById("f-note").value.trim(),
+    photo_url:photoUrl,
+    operator:_userName,
+    status:"READY",
+  };
+
+  try{
+    const item=await api("/items/",{method:"POST",body:JSON.stringify(body)});
+    toast("登録完了: "+internalCode);
+    showAddResult(item);
+    /* Log */
+    logAction({item_id:item.id, internal_code:item.internal_code, action:"ADD", operator:_userName});
+  }catch(e){ toast("登録エラー: "+e.message); }
+}
+
+function showAddResult(item){
+  document.getElementById("add-step3").style.display="";
+  /* Generate QR */
+  document.getElementById("qr-canvas").innerHTML="";
+  new QRCode(document.getElementById("qr-canvas"),{
+    text: item.internal_code,
+    width:180, height:180,
+    colorDark:"#111827", colorLight:"#ffffff",
+    correctLevel:QRCode.CorrectLevel.M
+  });
+  document.getElementById("qr-label-code").textContent=item.internal_code;
+  document.getElementById("qr-label-product").textContent=item.product;
+  /* Scroll into view */
+  setTimeout(()=>document.getElementById("add-step3").scrollIntoView({behavior:"smooth"}),200);
+}
+
+function resetAddForm(){
+  initAddPage();
+  document.getElementById("cam-add").innerHTML="";
+  document.getElementById("cam-add-overlay").classList.remove("show");
+  document.getElementById("add-step3").style.display="none";
+}
+
+/* ─────────────────────────────────────
+   PRINT QR
+───────────────────────────────────── */
+function printQR(){
+  const code=document.getElementById("qr-label-code").textContent;
+  const name=document.getElementById("qr-label-product").textContent;
+  const printerUrl=localStorage.getItem(PRINTER_URL_KEY)||"";
+
+  /* Try network printer first */
+  if(printerUrl){
+    const qrCanvas=document.querySelector("#qr-canvas canvas")||document.querySelector("#qr-canvas img");
+    let qrData=code;
+    try{
+      fetch(printerUrl,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({code,name,qr:qrData})})
+      .then(r=>{ if(r.ok) toast("プリンターに送信しました"); else toast("プリンター送信失敗"); })
+      .catch(()=>toast("プリンターに接続できません"));
+    }catch(_){ webPrint(code,name); }
+    return;
+  }
+  /* Fallback: web print dialog */
+  webPrint(code,name);
+}
+
+function webPrint(code,name){
+  /* Copy QR to print area */
+  document.getElementById("print-area").style.display="block";
+  document.getElementById("print-code").textContent=code;
+  document.getElementById("print-name").textContent=name;
+  document.getElementById("print-qr").innerHTML="";
+  new QRCode(document.getElementById("print-qr"),{text:code,width:160,height:160,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.M});
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>document.getElementById("print-area").style.display="none",1000);
+  },400);
+  /* Log print action */
+  logAction({internal_code:code, action:"PRINT", operator:_userName});
+}
+
+/* Reprint QR from detail view */
+function reprintQR(internalCode, productName){
+  webPrint(internalCode, productName);
+  toast("印刷処理を送信しました");
+}
+
+/* ─────────────────────────────────────
+   USE PAGE
+───────────────────────────────────── */
+function initUsePage(){
+  _scanLocked=false;
+  const container=document.getElementById("cam-use");
+  container.innerHTML="";
+  if(_useScanner){_useScanner.stop().catch(()=>{});_useScanner=null;}
+  _useScanner=new Html5Qrcode("cam-use");
+  _useScanner.start(
+    {facingMode:"environment"},
+    {fps:10,qrbox:{width:220,height:220}},
+    decoded=>{
+      if(_scanLocked) return;
+      _scanLocked=true;
+      _useScanner.stop().catch(()=>{}); _useScanner=null;
+      fetchItemByCode(decoded.trim());
+    },
+    ()=>{}
+  ).catch(e=>toast("カメラ起動失敗: "+e));
+}
+
+async function useByCode(){
+  const code=document.getElementById("use-code-input").value.trim();
+  if(!code){ toast("管理コードを入力してください"); return; }
+  await fetchItemByCode(code);
+}
+
+async function fetchItemByCode(code){
+  try{
+    const item=await api(`/items/by-code/${encodeURIComponent(code)}`);
+    showDetailModal(item);
+  }catch(e){ toast("部材が見つかりません: "+code); _scanLocked=false; }
+}
+
+/* ─────────────────────────────────────
+   DETAIL MODAL
+───────────────────────────────────── */
+function showDetailModal(item){
+  _currentItem=item;
+  const m=document.getElementById("detail-modal");
+  /* Photo */
+  const photo=document.getElementById("dm-photo");
+  if(item.photo_url){ photo.src=item.photo_url; photo.style.display="block"; }
+  else photo.style.display="none";
+  /* Fields */
+  const fields=[
+    {l:"管理コード",  v:item.internal_code, mono:true},
+    {l:"外部コード",  v:item.ext_code||"—"},
+    {l:"製品名",      v:item.product},
+    {l:"機種名",      v:item.model},
+    {l:"シリアル",    v:item.serial},
+    {l:"依頼者",      v:item.requester||"—"},
+    {l:"操作者",      v:item.operator},
+    {l:"登録日時",    v:fmtDate(item.created_at)},
+    {l:"ステータス",  v:item.status, badge:true},
+    {l:"備考",        v:item.note||"—"},
+    item.used_at?{l:"使用日時",  v:fmtDate(item.used_at)}:null,
+    item.used_by?{l:"使用者",    v:item.used_by}:null,
+  ].filter(Boolean);
+  document.getElementById("dm-fields").innerHTML=`
+    <div style="display:grid;grid-template-columns:90px 1fr;gap:5px 10px;font-size:13px;margin-bottom:6px;">
+      ${fields.map(f=>`
+        <span style="color:#9ca3af;">${esc(f.l)}</span>
+        <span style="color:#111827;font-weight:500;word-break:break-all;${f.mono?"font-family:monospace;":""}">
+          ${f.badge?`<span class="badge badge-${f.v==="READY"?"ready":"used"}">${esc(f.v)}</span>`:esc(f.v)}
+        </span>`).join("")}
+    </div>`;
+  /* Actions */
+  const acts=document.getElementById("dm-actions");
+  acts.innerHTML="";
+  if(item.status==="READY"){
+    const useBtn=document.createElement("button");
+    useBtn.className="btn btn-green"; useBtn.style.cssText="width:auto;padding:10px 20px;";
+    useBtn.textContent="使用済みにする（USED）";
+    useBtn.onclick=()=>markUsed(item);
+    acts.appendChild(useBtn);
+  }
+  /* Reprint button always */
+  const rpBtn=document.createElement("button");
+  rpBtn.className="btn btn-outline btn-sm";
+  rpBtn.textContent="QR再印刷";
+  rpBtn.onclick=()=>reprintQR(item.internal_code, item.product);
+  acts.appendChild(rpBtn);
+
+  m.classList.add("open");
+}
+
+async function markUsed(item){
+  try{
+    await api(`/items/${item.id}/use`,{method:"PUT",body:JSON.stringify({used_by:_userName})});
+    toast("USE済みに変更しました: "+item.internal_code);
+    closeModal("detail-modal");
+    logAction({item_id:item.id,internal_code:item.internal_code,action:"USE",operator:_userName});
+    /* Resume scanner */
+    _scanLocked=false;
+    initUsePage();
+  }catch(e){ toast("更新エラー: "+e.message); }
+}
+
+/* ─────────────────────────────────────
+   LIST PAGE
+───────────────────────────────────── */
+async function loadList(){
+  try{
+    _allItems=await api("/items/");
+    /* Populate filter dropdowns */
+    const models=[...new Set(_allItems.map(i=>i.model).filter(Boolean))].sort();
+    document.getElementById("list-model").innerHTML=`<option value="">すべて</option>`+
+      models.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join("");
+    const ops=[...new Set(_allItems.map(i=>i.operator).filter(Boolean))].sort();
+    document.getElementById("list-operator").innerHTML=`<option value="">すべて</option>`+
+      ops.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("");
+    renderList(_allItems);
+  }catch(e){ document.getElementById("list-content").innerHTML=`<p style="color:#dc2626;font-size:13px;">${e.message}</p>`; }
+}
+
+function filterList(){
+  const q=(document.getElementById("list-q").value||"").toLowerCase();
+  const st=document.getElementById("list-status").value;
+  const md=document.getElementById("list-model").value;
+  const op=document.getElementById("list-operator").value;
+  const dt=document.getElementById("list-date").value;
+  const filtered=_allItems.filter(i=>{
+    if(q && ![ i.internal_code,i.ext_code,i.product,i.model,i.serial,i.requester,i.operator ].some(f=>(f||"").toLowerCase().includes(q))) return false;
+    if(st && i.status!==st) return false;
+    if(md && i.model!==md) return false;
+    if(op && i.operator!==op) return false;
+    if(dt && !i.created_at?.startsWith(dt)) return false;
+    return true;
+  });
+  renderList(filtered);
+}
+
+function renderList(items){
+  document.getElementById("list-count").textContent=`${items.length}件`;
+  document.getElementById("list-content").innerHTML=items.map(item=>`
+    <div class="item-card" onclick="showDetailModal(${JSON.stringify(item).replace(/"/g,"&quot;")})">
+      ${item.photo_url
+        ? `<img class="item-thumb" src="${esc(item.photo_url)}" alt="" onerror="this.style.display='none'"/>`
+        : `<div class="item-thumb no-img"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`}
+      <div class="item-info">
+        <div class="item-name">${esc(item.product)}</div>
+        <div class="item-sub">${esc(item.internal_code)}${item.ext_code?" · "+esc(item.ext_code):""}</div>
+        <div class="item-meta">${esc(item.model)} / ${esc(item.serial)} · ${esc(item.operator)} · ${fmtDate(item.created_at)}</div>
+        <div style="margin-top:4px;"><span class="badge badge-${item.status==="READY"?"ready":"used"}">${item.status}</span></div>
+      </div>
+    </div>`).join("")||`<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">該当なし</p>`;
+}
+
+/* ─────────────────────────────────────
+   HISTORY PAGE
+───────────────────────────────────── */
+async function loadHistory(){
+  try{
+    _allHistory=await api("/history/");
+    renderHistory(_allHistory);
+  }catch(e){ document.getElementById("history-content").innerHTML=`<p style="color:#dc2626;font-size:13px;">${e.message}</p>`; }
+}
+
+function filterHistory(){
+  const q=(document.getElementById("hist-q").value||"").toLowerCase();
+  const filtered=_allHistory.filter(h=>
+    (h.internal_code||"").toLowerCase().includes(q)||(h.operator||"").toLowerCase().includes(q)
+  );
+  renderHistory(filtered);
+}
+
+function renderHistory(items){
+  const colors={ADD:"#dbeafe",USE:"#d1fae5",PRINT:"#fef3c7",DELETE:"#fee2e2"};
+  const textColors={ADD:"#1e40af",USE:"#065f46",PRINT:"#92400e",DELETE:"#991b1b"};
+  document.getElementById("history-content").innerHTML=items.map(h=>`
+    <div class="card" style="display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:11px;padding:3px 9px;border-radius:99px;font-weight:700;white-space:nowrap;background:${colors[h.action]||"#f3f4f6"};color:${textColors[h.action]||"#374151"};">${h.action}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111827;font-family:monospace;">${esc(h.internal_code||"—")}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">${esc(h.operator)}</div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${fmtDate(h.created_at)}</div>
+    </div>`).join("")||`<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">履歴なし</p>`;
+}
+
+async function logAction(data){
+  try{ await api("/history/",{method:"POST",body:JSON.stringify(data)}); }
+  catch(_){}
+}
+
+/* ─────────────────────────────────────
+   ADMIN PAGE
+───────────────────────────────────── */
+async function loadAdmin(){
+  try{
+    const users=await api("/users/");
+    document.getElementById("user-list").innerHTML=users.map(u=>`
+      <div class="card" style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#111827;">${esc(u.display_name||u.username)}</div>
+          <div style="font-size:12px;color:#6b7280;">${esc(u.username)}</div>
+        </div>
+        <span class="badge ${u.is_admin?"badge-admin":""}">${u.is_admin?"管理者":"ユーザー"}</span>
+        ${u.username!==_userId?`<button onclick="deleteUser('${esc(u.username)}')" style="font-size:11px;color:#dc2626;border:1px solid #fecaca;background:#fff;padding:3px 10px;border-radius:5px;cursor:pointer;">削除</button>`:""}
+      </div>`).join("")||"<p style='font-size:13px;color:#9ca3af;text-align:center;padding:10px;'>ユーザーなし</p>";
+  }catch(e){ toast("ユーザー読み込みエラー: "+e.message); }
+  document.getElementById("last-cleanup").textContent=localStorage.getItem("bm_last_cleanup")||"—";
+  document.getElementById("cleanup-days").value=localStorage.getItem("bm_cleanup_days")||"30";
+}
+
+function showAddUserModal(){ document.getElementById("add-user-modal").classList.add("open"); }
+async function createUser(){
+  const uid=document.getElementById("nu-id").value.trim();
+  const pw =document.getElementById("nu-pass").value;
+  const name=document.getElementById("nu-name").value.trim();
+  const role=document.getElementById("nu-role").value;
+  if(!uid||!pw||!name){ toast("全項目を入力してください"); return; }
+  try{
+    await api("/users/",{method:"POST",body:JSON.stringify({username:uid,password:pw,display_name:name,is_admin:role==="admin"})});
+    toast("ユーザーを追加しました: "+name);
+    closeModal("add-user-modal");
+    loadAdmin();
+    ["nu-id","nu-pass","nu-name"].forEach(id=>document.getElementById(id).value="");
+  }catch(e){ toast("エラー: "+e.message); }
+}
+async function deleteUser(uid){
+  if(!confirm(`${uid} を削除しますか？`)) return;
+  try{ await api(`/users/${encodeURIComponent(uid)}`,{method:"DELETE"}); toast("削除しました"); loadAdmin(); }
+  catch(e){ toast("エラー: "+e.message); }
+}
+async function runCleanup(){
+  const days=parseInt(document.getElementById("cleanup-days").value)||30;
+  if(!confirm(`${days}日以上前のUSED部材を削除します。続行しますか？`)) return;
+  try{
+    const r=await api(`/items/cleanup?days=${days}`,{method:"DELETE"});
+    const ts=new Date().toLocaleString("ja-JP");
+    localStorage.setItem("bm_last_cleanup",ts);
+    localStorage.setItem("bm_cleanup_days",days);
+    document.getElementById("last-cleanup").textContent=ts;
+    toast(`${r.deleted||0}件削除しました`);
+  }catch(e){ toast("エラー: "+e.message); }
+}
+function savePrinterUrl(){
+  const url=document.getElementById("printer-url").value.trim();
+  localStorage.setItem(PRINTER_URL_KEY,url);
+  toast("プリンターURLを保存しました");
+}
+
+/* ─────────────────────────────────────
+   CLICK OUTSIDE MODAL TO CLOSE
+───────────────────────────────────── */
+document.querySelectorAll(".modal-bg").forEach(bg=>{
+  bg.addEventListener("click",e=>{ if(e.target===bg) bg.classList.remove("open"); });
+});
+
+/* On USE page modal close — resume scanner */
+document.getElementById("detail-modal").querySelector("button").addEventListener("click",()=>{
+  _scanLocked=false;
+  const page=document.getElementById("page-use");
+  if(!page.classList.contains("hidden")) initUsePage();
+});
+</script>
+</body>
+</html>

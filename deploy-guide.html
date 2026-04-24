@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>部材管理システム — デプロイガイド</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f9fa;color:#111827;line-height:1.7;}
+.container{max-width:820px;margin:0 auto;padding:32px 20px 80px;}
+
+h1{font-size:26px;font-weight:800;color:#111827;margin-bottom:6px;}
+.subtitle{font-size:14px;color:#6b7280;margin-bottom:36px;}
+
+/* Section headers */
+.phase{display:flex;align-items:center;gap:12px;margin:36px 0 16px;}
+.phase-num{width:36px;height:36px;border-radius:50%;background:#d97706;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.phase h2{font-size:18px;font-weight:700;color:#111827;}
+
+/* Step card */
+.step{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;overflow:hidden;}
+.step-header{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.step-header:hover{background:#fefce8;}
+.step-num{width:26px;height:26px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-title{font-size:14px;font-weight:600;color:#374151;flex:1;}
+.step-arrow{font-size:12px;color:#9ca3af;transition:transform .2s;}
+.step-arrow.open{transform:rotate(90deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid #f3f4f6;}
+.step-body.open{display:block;}
+
+/* Content inside steps */
+p{font-size:13px;color:#4b5563;margin:10px 0 6px;}
+.note{background:#fef3c7;border-left:3px solid #d97706;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#92400e;margin:10px 0;}
+.warn{background:#fee2e2;border-left:3px solid #dc2626;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#991b1b;margin:10px 0;}
+.success{background:#d1fae5;border-left:3px solid #059669;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#065f46;margin:10px 0;}
+
+/* Code block */
+pre{background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:14px;font-size:12px;overflow-x:auto;margin:8px 0;line-height:1.6;}
+code{font-family:"SF Mono","Fira Code",monospace;}
+.inline-code{background:#f3f4f6;color:#374151;padding:1px 6px;border-radius:4px;font-size:12px;font-family:monospace;}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;}
+th{background:#f9fafb;padding:8px 10px;text-align:left;font-weight:600;color:#374151;border:1px solid #e5e7eb;}
+td{padding:8px 10px;border:1px solid #e5e7eb;color:#4b5563;vertical-align:top;}
+td code{background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;}
+tr:nth-child(even) td{background:#f9fafb;}
+
+/* Screenshot placeholder */
+.img-hint{background:#f3f4f6;border:2px dashed #d1d5db;border-radius:8px;padding:14px;text-align:center;font-size:12px;color:#9ca3af;margin:8px 0;}
+
+/* Progress bar */
+.progress{display:flex;align-items:center;gap:6px;margin-bottom:28px;}
+.prog-step{flex:1;height:4px;border-radius:2px;background:#e5e7eb;}
+.prog-step.done{background:#d97706;}
+.prog-label{font-size:11px;color:#9ca3af;white-space:nowrap;}
+
+/* Checklist */
+.checklist{list-style:none;display:flex;flex-direction:column;gap:6px;margin:8px 0;}
+.checklist li{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b5563;}
+.checklist li::before{content:"☐";font-size:15px;color:#d97706;flex-shrink:0;line-height:1.3;}
+
+/* Arch diagram */
+.arch{background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:16px;font-size:12px;color:#374151;font-family:monospace;white-space:pre;overflow-x:auto;margin:8px 0;}
+
+/* Section divider */
+hr{border:none;border-top:1px solid #e5e7eb;margin:32px 0;}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🔧 部材管理システム — デプロイガイド</h1>
+<p class="subtitle">所要時間: 約30〜45分 ／ 難易度: ★★☆☆☆</p>
+
+<!-- Architecture overview -->
+<div class="step" style="border-color:#d97706;">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num" style="background:#d97706;color:#fff;">📐</div>
+    <span class="step-title">システム構成の全体像</span>
+    <span class="step-arrow open">▶</span>
+  </div>
+  <div class="step-body open">
+    <div class="arch">┌─────────────────────────────────────────────┐
+│              ユーザーのブラウザ / スマホ              │
+│         https://yourname.github.io/buaizai         │
+│                  index.html (1ファイル)              │
+└────────────────────┬────────────────────────────┘
+                     │ HTTPS API呼び出し
+                     ▼
+┌─────────────────────────────────────────────┐
+│           Render.com — Web Service           │
+│        FastAPI (Python) バックエンド          │
+│     https://buaizai-api.onrender.com         │
+└──────┬─────────────────────┬───────────────┘
+       │ PostgreSQL接続       │ 写真アップロード
+       ▼                     ▼
+┌──────────────┐   ┌──────────────────────┐
+│  Render DB   │   │  Cloudflare R2 / S3  │
+│  PostgreSQL  │   │  (写真ストレージ)      │
+└──────────────┘   └──────────────────────┘</div>
+    <p>デプロイに必要なアカウント:</p>
+    <ul class="checklist">
+      <li>GitHub アカウント（無料）</li>
+      <li>Render.com アカウント（無料プランで動作します）</li>
+      <li>Cloudflare アカウント（写真保存用 R2 — 10GBまで無料）</li>
+    </ul>
+  </div>
+</div>
+
+<!-- PHASE 1 -->
+<div class="phase">
+  <div class="phase-num">1</div>
+  <h2>GitHubリポジトリの準備</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">1-1</div>
+    <span class="step-title">バックエンド用リポジトリを作成する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① <a href="https://github.com" target="_blank">github.com</a> にログイン → 右上の「+」→「New repository」</p>
+    <p>② 以下の設定で作成する:</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Repository name</td><td><code>buaizai-backend</code></td></tr>
+      <tr><td>Visibility</td><td>Private（推奨）</td></tr>
+      <tr><td>Initialize with README</td><td>チェックしない</td></tr>
+    </table>
+    <p>③ ローカルPCで <span class="inline-code">buaizai-backend/</span> フォルダに移動してpush:</p>
+    <pre><code>cd buaizai-backend
+git init
+git add .
+git commit -m "feat: initial backend"
+git branch -M main
+git remote add origin https://github.com/あなたのID/buaizai-backend.git
+git push -u origin main</code></pre>
+    <div class="note">💡 GitがインストールされていないPCの場合は <a href="https://desktop.github.com" target="_blank">GitHub Desktop</a> を使うと簡単です</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">1-2</div>
+    <span class="step-title">フロントエンド用リポジトリを作成する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① 同様に新しいリポジトリを作成:</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Repository name</td><td><code>buaizai-app</code></td></tr>
+      <tr><td>Visibility</td><td>Public（GitHub Pagesに必要）</td></tr>
+    </table>
+    <p>② <span class="inline-code">index.html</span> をリポジトリのルートに配置してpush</p>
+    <div class="warn">⚠ この時点ではまだ <span class="inline-code">const API = "..."</span> は変更しない。Render URLが決まってから変更します</div>
+  </div>
+</div>
+
+<!-- PHASE 2 -->
+<div class="phase">
+  <div class="phase-num">2</div>
+  <h2>Render.com — PostgreSQLデータベース作成</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">2-1</div>
+    <span class="step-title">Renderアカウントを作成してDBを作る</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① <a href="https://render.com" target="_blank">render.com</a> でGitHubアカウントでサインアップ</p>
+    <p>② ダッシュボード → 「New +」→「PostgreSQL」</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Name</td><td><code>buaizai-db</code></td></tr>
+      <tr><td>Database</td><td><code>buaizai</code></td></tr>
+      <tr><td>User</td><td><code>buaizai_user</code></td></tr>
+      <tr><td>Region</td><td>Singapore（日本に最も近い）</td></tr>
+      <tr><td>Plan</td><td>Free（開発）/ Starter $7/月（本番推奨）</td></tr>
+    </table>
+    <p>③「Create Database」をクリック → 作成完了まで1〜2分待つ</p>
+    <p>④ 作成後、DBの詳細画面で <strong>「Internal Database URL」</strong> をコピーしてメモする</p>
+    <pre><code>postgresql://buaizai_user:XXXXXXXX@dpg-XXXXX.singapore-postgres.render.com/buaizai</code></pre>
+    <div class="warn">⚠ このURLにはパスワードが含まれます。第三者に見せないよう注意してください</div>
+  </div>
+</div>
+
+<!-- PHASE 3 -->
+<div class="phase">
+  <div class="phase-num">3</div>
+  <h2>Render.com — バックエンドAPIのデプロイ</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">3-1</div>
+    <span class="step-title">Web Serviceを作成する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① ダッシュボード → 「New +」→「Web Service」</p>
+    <p>② 「Connect a repository」→ GitHubと連携 → <span class="inline-code">buaizai-backend</span> を選択</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Name</td><td><code>buaizai-api</code></td></tr>
+      <tr><td>Region</td><td>Singapore</td></tr>
+      <tr><td>Branch</td><td>main</td></tr>
+      <tr><td>Runtime</td><td>Python 3</td></tr>
+      <tr><td>Build Command</td><td><code>pip install -r requirements.txt</code></td></tr>
+      <tr><td>Start Command</td><td><code>uvicorn main:app --host 0.0.0.0 --port $PORT</code></td></tr>
+      <tr><td>Plan</td><td>Free（スリープあり）/ Starter $7/月（推奨）</td></tr>
+    </table>
+    <div class="note">💡 無料プランは15分間アクセスがないとスリープします。最初のアクセスに30秒ほどかかります。本番運用にはStarter以上を推奨します</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">3-2</div>
+    <span class="step-title">環境変数（Environment Variables）を設定する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>Web Service設定画面 → 「Environment」タブ → 以下を1行ずつ追加:</p>
+    <table>
+      <tr><th>Key</th><th>Value（内容）</th><th>必須</th></tr>
+      <tr><td><code>DATABASE_URL</code></td><td>Step 2-1でコピーしたInternal URL</td><td>✅</td></tr>
+      <tr><td><code>SECRET_KEY</code></td><td>ランダム文字列32文字以上 ※下記参照</td><td>✅</td></tr>
+      <tr><td><code>DEFAULT_ADMIN_ID</code></td><td><code>admin</code> （後で変更可）</td><td>✅</td></tr>
+      <tr><td><code>DEFAULT_ADMIN_PW</code></td><td>安全なパスワード（8文字以上）</td><td>✅</td></tr>
+      <tr><td><code>ALLOWED_ORIGINS</code></td><td><code>https://あなたのID.github.io</code></td><td>✅</td></tr>
+      <tr><td><code>STORAGE_BACKEND</code></td><td><code>local</code>（まずはこれで動作確認）</td><td>✅</td></tr>
+      <tr><td><code>LOCAL_BASE_URL</code></td><td>デプロイ後に決まるRender URL</td><td>✅</td></tr>
+      <tr><td><code>TOKEN_EXPIRE_HOURS</code></td><td><code>12</code></td><td>✅</td></tr>
+      <tr><td><code>AUTO_CLEANUP_DAYS</code></td><td><code>30</code>（0で無効）</td><td>—</td></tr>
+    </table>
+    <p>SECRET_KEY の生成方法（ターミナルで実行）:</p>
+    <pre><code># Python で生成
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# または openssl で生成
+openssl rand -hex 32</code></pre>
+    <div class="note">💡 Render の「Generate Value」ボタンを使うと自動生成できます</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">3-3</div>
+    <span class="step-title">デプロイを実行して動作確認する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① 「Create Web Service」→ 自動でビルド・デプロイが始まる（3〜5分）</p>
+    <p>② ログに以下が表示されれば成功:</p>
+    <pre><code>INFO:     Started server process
+INFO:     Uvicorn running on http://0.0.0.0:XXXXX
+[seed] デフォルト管理者を作成しました → admin / admin1234</code></pre>
+    <p>③ デプロイ後のURL（例: <span class="inline-code">https://buaizai-api.onrender.com</span>）にアクセス:</p>
+    <pre><code># ブラウザまたはcurlで確認
+curl https://buaizai-api.onrender.com/health
+
+# 返答:
+{"ok": true}</code></pre>
+    <div class="success">✅ {"ok": true} が返れば バックエンドのデプロイ成功です！</div>
+    <p>④ URLをメモする → <strong>これがAPI_URLになります</strong></p>
+    <p>⑤ Render環境変数の <span class="inline-code">LOCAL_BASE_URL</span> をこのURLに更新する</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">3-4</div>
+    <span class="step-title">APIドキュメントを確認する（オプション）</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>FastAPIは自動でAPIドキュメントを生成します:</p>
+    <pre><code>https://buaizai-api.onrender.com/docs    # Swagger UI
+https://buaizai-api.onrender.com/redoc   # ReDoc</code></pre>
+    <p>ここで各エンドポイントを直接テストすることができます。</p>
+    <div class="img-hint">📸 Swagger UI でロックアイコンをクリック → JWT トークンを入力するとテスト可能</div>
+  </div>
+</div>
+
+<!-- PHASE 4 -->
+<div class="phase">
+  <div class="phase-num">4</div>
+  <h2>Cloudflare R2 — 写真ストレージの設定（推奨）</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">4-1</div>
+    <span class="step-title">なぜR2が必要か</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <div class="warn">⚠ Renderの無料プランはディスクが「揮発性」です。再デプロイのたびにローカル保存した写真が消えます。本番運用には必ずR2またはS3を使ってください</div>
+    <table>
+      <tr><th></th><th>Local (Render)</th><th>Cloudflare R2</th></tr>
+      <tr><td>料金</td><td>無料</td><td>10GBまで無料</td></tr>
+      <tr><td>永続性</td><td>❌ 再デプロイで消える</td><td>✅ 永続</td></tr>
+      <tr><td>設定の手間</td><td>不要</td><td>10分程度</td></tr>
+      <tr><td>本番運用</td><td>❌ 不可</td><td>✅ 推奨</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">4-2</div>
+    <span class="step-title">R2バケットを作成する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> にログイン</p>
+    <p>② 左メニュー「R2 Object Storage」→「Create bucket」</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Bucket name</td><td><code>buaizai-photos</code></td></tr>
+      <tr><td>Location</td><td>Asia Pacific (APAC)</td></tr>
+    </table>
+    <p>③ 作成後、バケット設定 → 「Settings」→「Public Access」→「Allow Access」を有効化</p>
+    <p>④ 「Public bucket URL」をコピーしてメモ（例: <span class="inline-code">https://pub-XXXX.r2.dev</span>）</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">4-3</div>
+    <span class="step-title">APIトークンを発行する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① Cloudflareダッシュボード右上 → アイコン → 「My Profile」</p>
+    <p>② 「API Tokens」→「Create Token」→「Create Custom Token」</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>Token name</td><td><code>buaizai-r2</code></td></tr>
+      <tr><td>Permissions</td><td>Account → R2 Storage → Edit</td></tr>
+      <tr><td>Account Resources</td><td>Include → All accounts</td></tr>
+    </table>
+    <p>③「Continue to summary」→「Create Token」→ 表示されたトークンをコピー（<strong>一度しか表示されません</strong>）</p>
+    <p>④ R2の設定画面でアカウントIDをコピー（URLの<span class="inline-code">dash.cloudflare.com/<strong>ACCOUNT_ID</strong>/r2</span>の部分）</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">4-4</div>
+    <span class="step-title">RenderにR2の環境変数を追加する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>Render → buaizai-api → Environment に以下を追加（または更新）:</p>
+    <table>
+      <tr><th>Key</th><th>Value</th></tr>
+      <tr><td><code>STORAGE_BACKEND</code></td><td><code>r2</code>（localから変更）</td></tr>
+      <tr><td><code>R2_ACCOUNT_ID</code></td><td>CloudflareのアカウントID</td></tr>
+      <tr><td><code>R2_ACCESS_KEY_ID</code></td><td>作成したAPIトークンのAccess Key ID</td></tr>
+      <tr><td><code>R2_SECRET_ACCESS_KEY</code></td><td>作成したAPIトークンのSecret</td></tr>
+      <tr><td><code>R2_BUCKET_NAME</code></td><td><code>buaizai-photos</code></td></tr>
+      <tr><td><code>R2_PUBLIC_URL</code></td><td>コピーしたPublic bucket URL</td></tr>
+    </table>
+    <p>変数を保存すると自動で再デプロイされます。</p>
+    <div class="note">💡 R2のAPIトークンには「Access Key ID」と「Secret Access Key」の2つがあります。R2バケット画面 → 「Manage R2 API tokens」から確認できます</div>
+  </div>
+</div>
+
+<!-- PHASE 5 -->
+<div class="phase">
+  <div class="phase-num">5</div>
+  <h2>GitHub Pages — フロントエンドの公開</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">5-1</div>
+    <span class="step-title">index.html の API URL を更新する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① <span class="inline-code">index.html</span> をテキストエディタで開く</p>
+    <p>② 先頭付近の以下の行を探して変更する:</p>
+    <pre><code>// 変更前
+const API = "https://YOUR-BUAIZAI-BACKEND.onrender.com";
+
+// 変更後（Renderのデプロイ先URLに変更）
+const API = "https://buaizai-api.onrender.com";</code></pre>
+    <p>③ 保存してGitHubリポジトリにpush:</p>
+    <pre><code>git add index.html
+git commit -m "fix: update API URL"
+git push</code></pre>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">5-2</div>
+    <span class="step-title">GitHub Pages を有効化する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① GitHubの <span class="inline-code">buaizai-app</span> リポジトリを開く</p>
+    <p>② 上部タブ「Settings」→ 左メニュー「Pages」</p>
+    <p>③「Source」を「Deploy from a branch」に設定</p>
+    <p>④「Branch」を <span class="inline-code">main</span>、フォルダを <span class="inline-code">/ (root)</span> に設定 → 「Save」</p>
+    <p>⑤ 1〜2分後にURLが表示される:</p>
+    <pre><code>https://あなたのGitHubID.github.io/buaizai-app</code></pre>
+    <div class="success">✅ このURLがユーザーに配布するURLになります</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">5-3</div>
+    <span class="step-title">CORS設定を更新する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>GitHub PagesのURLが確定したら、Renderの環境変数を更新:</p>
+    <table>
+      <tr><th>Key</th><th>Value</th></tr>
+      <tr><td><code>ALLOWED_ORIGINS</code></td><td><code>https://あなたのID.github.io</code></td></tr>
+    </table>
+    <p>複数のオリジンを許可する場合はカンマ区切り:</p>
+    <pre><code>https://yourname.github.io,http://localhost:3000</code></pre>
+    <div class="note">💡 開発中は <code>*</code> のままで問題ありません。本番公開前に特定のURLに絞ることを推奨します</div>
+  </div>
+</div>
+
+<!-- PHASE 6 -->
+<div class="phase">
+  <div class="phase-num">6</div>
+  <h2>初期設定と動作確認</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">6-1</div>
+    <span class="step-title">初回ログインとパスワード変更</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① <span class="inline-code">https://あなたのID.github.io/buaizai-app</span> にアクセス</p>
+    <p>② ログイン画面が表示されることを確認</p>
+    <p>③ デフォルト管理者でログイン:</p>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>ユーザーID</td><td><code>admin</code>（DEFAULT_ADMIN_IDで設定した値）</td></tr>
+      <tr><td>パスワード</td><td><code>admin1234</code>（DEFAULT_ADMIN_PWで設定した値）</td></tr>
+    </table>
+    <div class="warn">⚠ ログイン後すぐに管理設定 → パスワード変更を行ってください</div>
+    <p>④ ダッシュボードが表示されれば成功です</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">6-2</div>
+    <span class="step-title">現場ユーザーのアカウントを作成する</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① 管理設定 → ユーザー管理 → 「+ 追加」</p>
+    <table>
+      <tr><th>項目</th><th>例</th></tr>
+      <tr><td>ユーザーID</td><td><code>yamada@company.com</code></td></tr>
+      <tr><td>パスワード</td><td>本人に伝える安全なパスワード</td></tr>
+      <tr><td>表示名</td><td><code>山田 太郎</code></td></tr>
+      <tr><td>権限</td><td>一般ユーザー（管理者機能不要な場合）</td></tr>
+    </table>
+    <p>② 作成したID・パスワードをユーザーに伝える</p>
+    <p>③ ユーザーはスマートフォンのブラウザでURLにアクセスしてログイン</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">6-3</div>
+    <span class="step-title">ADD 部材 の動作テスト</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <ul class="checklist">
+      <li>「ADD 部材」タブを開く</li>
+      <li>「カメラ起動」→ カメラが起動することを確認（スマートフォン推奨）</li>
+      <li>写真を撮影またはファイル選択でテスト画像を選ぶ</li>
+      <li>機種名・シリアル・製品名を入力</li>
+      <li>内部管理コードが自動生成されていることを確認</li>
+      <li>「確認して登録」をクリック</li>
+      <li>QRコードが表示されることを確認</li>
+      <li>「印刷」ボタンの動作確認</li>
+    </ul>
+    <div class="success">✅ QRコードが表示されれば登録機能は正常です</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">6-4</div>
+    <span class="step-title">USE 部材 の動作テスト</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <ul class="checklist">
+      <li>「USE 部材」タブを開く</li>
+      <li>ADD で生成したQRコードをスキャン（または管理コードを手入力）</li>
+      <li>部材の詳細情報がポップアップ表示されることを確認</li>
+      <li>「使用済みにする」ボタンをクリック</li>
+      <li>部材一覧でステータスが USED に変わっていることを確認</li>
+    </ul>
+  </div>
+</div>
+
+<!-- PHASE 7 -->
+<div class="phase">
+  <div class="phase-num">7</div>
+  <h2>ネットワークプリンター連携（オプション）</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">7-1</div>
+    <span class="step-title">対応プリンターと構成</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>ZPL対応のラベルプリンター（Brother QL, Zebra ZD, DYMO など）をWi-Fiネットワーク上に配置し、ミドルウェアPCを経由して印刷します。</p>
+    <div class="arch">スマートフォン → GitHub Pages → Render API → ×（プリンターに直接は届かない）
+
+スマートフォン → GitHub Pages → ローカルミドルウェアPC → プリンター ✅</div>
+    <div class="note">💡 プリンターとミドルウェアPCは同一のWi-Fiネットワーク上にある必要があります</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">7-2</div>
+    <span class="step-title">ミドルウェアをセットアップする</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>① ミドルウェアPC（Windows/Mac/Raspberry Pi）に Python をインストール</p>
+    <p>② 以下の <span class="inline-code">printer_server.py</span> を作成して実行:</p>
+    <pre><code>pip install flask flask-cors</code></pre>
+    <pre><code># printer_server.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import socket
+
+app = Flask(__name__)
+CORS(app)  # GitHub Pagesからのリクエストを許可
+
+PRINTER_IP   = "192.168.1.200"  # ← プリンターのIPアドレスに変更
+PRINTER_PORT = 9100              # ZPL標準ポート
+
+def build_zpl(code: str, name: str) -> str:
+    """ZPLラベルフォーマット (62mm x 29mm)"""
+    safe_name = name[:22].replace("^", " ")
+    return (
+        "^XA"
+        "^PW490"          # ラベル幅 (62mm @ 203dpi)
+        "^LL230"          # ラベル高さ (29mm @ 203dpi)
+        f"^FO20,10^BQN,2,5^FDQA,{code}^FS"   # QRコード
+        f"^FO200,20^A0N,30,30^FD{code}^FS"   # 管理コード
+        f"^FO200,60^A0N,22,22^FD{safe_name}^FS"  # 製品名
+        "^XZ"
+    )
+
+@app.route("/print", methods=["POST"])
+def print_label():
+    data = request.get_json()
+    code = data.get("code", "")
+    name = data.get("name", "")
+    if not code:
+        return jsonify({"ok": False, "error": "code is required"}), 400
+    zpl = build_zpl(code, name)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(5)
+            s.connect((PRINTER_IP, PRINTER_PORT))
+            s.sendall(zpl.encode("utf-8"))
+        return jsonify({"ok": True, "code": code})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"ok": True, "printer": PRINTER_IP})
+
+if __name__ == "__main__":
+    print(f"プリンターサーバー起動: http://0.0.0.0:8888")
+    print(f"プリンターIP: {PRINTER_IP}:{PRINTER_PORT}")
+    app.run(host="0.0.0.0", port=8888, debug=False)</code></pre>
+    <p>③ 起動:</p>
+    <pre><code>python printer_server.py</code></pre>
+    <p>④ ミドルウェアPCのローカルIPを確認:</p>
+    <pre><code># Windows
+ipconfig | findstr "IPv4"
+
+# Mac/Linux
+ifconfig | grep "inet " | grep -v 127.0.0.1</code></pre>
+    <p>⑤ Webアプリの「管理設定 → プリンターURL」に入力:</p>
+    <pre><code>http://192.168.1.100:8888/print</code></pre>
+    <div class="warn">⚠ スマートフォンとミドルウェアPCが同じWi-Fiに接続されている必要があります。社内LAN外からは使用できません</div>
+  </div>
+</div>
+
+<!-- PHASE 8 -->
+<div class="phase">
+  <div class="phase-num">8</div>
+  <h2>トラブルシューティング</h2>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">❓</div>
+    <span class="step-title">よくあるエラーと解決方法</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <table>
+      <tr><th>症状</th><th>原因</th><th>解決方法</th></tr>
+      <tr><td>ログインできない</td><td>DEFAULT_ADMIN_PW の設定ミス</td><td>Renderの環境変数を確認。変更後はサービスを Manual Deploy</td></tr>
+      <tr><td>「CORS error」がコンソールに出る</td><td>ALLOWED_ORIGINS が未設定</td><td>GitHub PagesのURLをALLOWED_ORIGINSに追加</td></tr>
+      <tr><td>写真が表示されない（再デプロイ後）</td><td>Localストレージは揮発性</td><td>Step 4 を参照してR2に移行する</td></tr>
+      <tr><td>APIが500エラーを返す</td><td>DATABASE_URLが間違っている</td><td>Render DBのInternal URLを再確認。External URLは不可</td></tr>
+      <tr><td>最初のアクセスが遅い（30秒）</td><td>Freeプランのスリープ</td><td>Starter以上にアップグレード、またはcron jobで定期的にpingする</td></tr>
+      <tr><td>カメラが起動しない</td><td>HTTPSが必要</td><td>GitHub PagesはHTTPS。localhostでのテストはOK</td></tr>
+      <tr><td>QRが読み取れない</td><td>カメラの解像度不足</td><td>明るい場所で撮影。QRコードのサイズを大きくする</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header" onclick="toggle(this)">
+    <div class="step-num">❓</div>
+    <span class="step-title">Renderのログ確認方法</span>
+    <span class="step-arrow">▶</span>
+  </div>
+  <div class="step-body">
+    <p>Render → buaizai-api → 「Logs」タブでリアルタイムログを確認できます。</p>
+    <pre><code># エラー例と意味
+"relation 'items' does not exist"
+→ DBの初期化が失敗。DATABASE_URLが正しいか確認
+
+"password authentication failed"
+→ DATABASE_URLのパスワードが間違っている
+
+"ModuleNotFoundError: No module named 'xxx'"
+→ requirements.txt に該当パッケージを追加してredeploy</code></pre>
+  </div>
+</div>
+
+<!-- Final checklist -->
+<hr/>
+<div class="step" style="border-color:#059669;">
+  <div class="step-header" onclick="toggle(this)" style="background:#f0fdf4;">
+    <div class="step-num" style="background:#059669;color:#fff;">✅</div>
+    <span class="step-title" style="color:#065f46;">デプロイ完了チェックリスト</span>
+    <span class="step-arrow open">▶</span>
+  </div>
+  <div class="step-body open">
+    <ul class="checklist">
+      <li>バックエンドをGitHubにpush済み</li>
+      <li>Render PostgreSQL を作成し Internal URL をメモ済み</li>
+      <li>Render Web Service を作成し全環境変数を設定済み</li>
+      <li><code>/health</code> が <code>{"ok": true}</code> を返すことを確認済み</li>
+      <li>Cloudflare R2 バケット作成・APIトークン取得済み（推奨）</li>
+      <li>R2環境変数をRenderに設定済み（推奨）</li>
+      <li><code>index.html</code> の API URL を Render URL に変更済み</li>
+      <li>GitHub Pages を有効化してURLを取得済み</li>
+      <li>Render の <code>ALLOWED_ORIGINS</code> に GitHub Pages URL を設定済み</li>
+      <li>管理者でログインしてダッシュボードが表示されることを確認済み</li>
+      <li>デフォルト管理者のパスワードを変更済み</li>
+      <li>現場スタッフのアカウントを発行済み</li>
+      <li>ADD・USE・一覧の動作テストを完了済み</li>
+    </ul>
+    <div class="success" style="margin-top:12px;">🎉 全項目チェックできたら本番運用開始です！お疲れ様でした。</div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+function toggle(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector(".step-arrow");
+  body.classList.toggle("open");
+  arrow.classList.toggle("open");
+}
+</script>
+</body>
+</html>
